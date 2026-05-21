@@ -33,65 +33,84 @@ module Yoo
 
       # Get all commands from the registry and ObjectSpace
       def self.get_all_available_commands
-        commands = []
-        
         begin
-          puts "CustomToolbar: Scanning for commands..."
-          
-          # Strategy 1: Get from registry (commands that were explicitly registered)
-          commands.concat(@command_registry.values)
-          puts "CustomToolbar: Registry has #{@command_registry.values.length} commands"
-          
-          # Strategy 2: Scan ObjectSpace for all UI::Command instances
+          # Deduplicate by Ruby object_id - each unique Command object appears once
+          seen_object_ids = {}
+
+          # Strategy 1: Scan ObjectSpace for all UI::Command instances (most complete source)
           object_space_count = 0
           begin
             ObjectSpace.each_object(UI::Command) do |cmd|
+              oid = cmd.object_id
+              next if seen_object_ids.key?(oid)
               object_space_count += 1
-              cmd_info = {
+              seen_object_ids[oid] = {
                 id: generate_command_id(cmd),
                 name: cmd.menu_text || cmd.tooltip || 'Unknown',
                 tooltip: cmd.tooltip || '',
                 status_bar_text: cmd.status_bar_text || '',
                 icon_path: cmd.small_icon || cmd.large_icon || '',
                 source_toolbar: infer_source_toolbar(cmd),
-                command_ref: cmd.object_id.to_s
+                command_ref: oid.to_s
               }
-              commands << cmd_info
             end
           rescue => e
-            puts "CustomToolbar: ObjectSpace scan error: #{e.message}"
+            # ignore ObjectSpace scan errors
           end
-          puts "CustomToolbar: Found #{object_space_count} commands in ObjectSpace"
-          
-          # Strategy 3: Discover commands from known extension modules
+
+          # Strategy 2: Registry may have better source names - update existing entries
+          @command_registry.each do |_id, reg_cmd|
+            oid = reg_cmd[:command_ref].to_i
+            if seen_object_ids.key?(oid)
+              seen_object_ids[oid][:source_toolbar] = reg_cmd[:source_toolbar] if reg_cmd[:source_toolbar] != 'Unknown'
+            end
+          end
+
+          commands = seen_object_ids.values
+
+          # Strategy 3: Discover commands from known extension modules (catches local vars)
           ext_commands = discover_from_extension_modules
-          commands.concat(ext_commands)
-          puts "CustomToolbar: Found #{ext_commands.length} commands from extension modules"
-          
-          # Remove duplicates by ID and sort by name
-          unique_commands = commands.uniq { |c| c[:id] }
-          puts "CustomToolbar: Total unique commands: #{unique_commands.length}"
-          
-          unique_commands.sort_by { |cmd| cmd[:name].downcase }
+          ext_commands.each do |ec|
+            oid = ec[:command_ref].to_i
+            next if seen_object_ids.key?(oid)
+            commands << ec
+          end
+          commands.sort_by { |cmd| cmd[:name].downcase }
         rescue => e
-          puts "CustomToolbar FATAL: #{e.message}"
-          puts e.backtrace.first(10).join("\n")
           []
         end
       end
 
-      # Try to infer which toolbar a command belongs to
+      # Try to infer which toolbar/plugin a command belongs to
       def self.infer_source_toolbar(command)
         begin
-          # Check if command is registered
+          # Check if command is registered with an explicit source
           id = generate_command_id(command)
           if @command_registry[id]
             return @command_registry[id][:source_toolbar]
           end
-          
-          # Try to find command in toolbar instances by checking if it's visible
+
+          # Derive plugin name from the icon file path
+          # Most extensions store icons under .../Plugins/<plugin_folder>/...
+          icon = command.small_icon || command.large_icon
+          if icon && !icon.empty?
+            parts = icon.gsub('\\', '/').split('/')
+            plugins_idx = parts.rindex { |p| p.downcase == 'plugins' }
+            if plugins_idx && parts.length > plugins_idx + 1
+              folder = parts[plugins_idx + 1]
+              # Clean up folder name: remove leading numbers/underscores, replace _ with space
+              name = folder.gsub(/\A\d+_/, '').gsub('_', ' ').strip
+              return name unless name.empty?
+            end
+            # Fallback: use the icon's immediate parent folder name
+            parent = File.basename(File.dirname(icon))
+            unless parent.empty? || parent == '.' || parent.downcase == 'plugins'
+              return parent.gsub('_', ' ').strip
+            end
+          end
+
+          # Try to match against live toolbar names
           UI::Toolbar.instances.each do |toolbar|
-            icon = command.small_icon || command.large_icon
             if icon && toolbar.respond_to?(:name) && icon.include?(toolbar.name.gsub(' ', '_'))
               return toolbar.name
             end
@@ -99,7 +118,7 @@ module Yoo
         rescue => e
           # Ignore errors in source inference
         end
-        
+
         'Unknown'
       end
 

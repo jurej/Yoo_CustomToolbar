@@ -2,5 +2,6 @@
 *.zip
 .DS_Store
 Thumbs.db
+desktop.ini
 *.tmp
 *.bak

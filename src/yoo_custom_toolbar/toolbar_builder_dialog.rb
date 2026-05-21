@@ -18,39 +18,35 @@ module Yoo
         @dialog = create_dialog
         setup_dialog_callbacks(@dialog)
         @dialog.show
-
-        # Delay push to let dialog JS context initialize
-        UI.start_timer(0.3, false) do
-          push_data_to_dialog(@dialog)
-        end
       end
 
       # Push commands and saved toolbars to the dialog
       def self.push_data_to_dialog(dialog)
         begin
-          puts "CustomToolbar: Pushing data to dialog..."
           commands = CommandScanner.get_all_available_commands
-          puts "CustomToolbar: Pushing #{commands.length} commands"
           configs = SettingsStore.load_from_preferences
-          puts "CustomToolbar: Pushing #{configs.length} saved toolbars"
 
           # Push commands in batches to avoid large-JSON issues
-          total = commands.length
+          # Normalize backslashes in icon paths so Windows paths don't break execute_script
+          safe_commands = commands.map do |cmd|
+            cmd.merge(icon_path: (cmd[:icon_path] || '').gsub('\\', '/'))
+          end
           dialog.execute_script("window._cmdData = [];")
           
-          commands.each_slice(100) do |batch|
+          safe_commands.each_slice(100) do |batch|
             json_batch = batch.to_json
             dialog.execute_script("window._cmdData = window._cmdData.concat(#{json_batch});")
           end
           
           dialog.execute_script("updateAvailableCommands(window._cmdData);")
           
-          # Push saved toolbars
-          json_configs = configs.to_json
-          dialog.execute_script("updateSavedToolbars(#{json_configs});")
+          # Push saved toolbars (normalize icon paths for Windows)
+          safe_configs = configs.map do |c|
+            c.merge(commands: (c[:commands] || []).map { |cmd| cmd.merge(icon_path: (cmd[:icon_path] || '').gsub('\\', '/')) })
+          end
+          dialog.execute_script("updateSavedToolbars(#{safe_configs.to_json});")
         rescue => e
-          puts "CustomToolbar ERROR pushing data: #{e.message}"
-          puts e.backtrace.first(5).join("\n")
+          # ignore
         end
       end
 
@@ -83,14 +79,16 @@ module Yoo
         # Get available commands
         dialog.add_action_callback('get_available_commands') do |action_context|
           begin
-            puts "CustomToolbar: get_available_commands callback triggered"
             commands = CommandScanner.get_all_available_commands
-            puts "CustomToolbar: Returning #{commands.length} commands to dialog"
-            json = commands.to_json
-            dialog.execute_script("updateAvailableCommands(#{json})")
+            safe_commands = commands.map do |cmd|
+              cmd.merge(icon_path: (cmd[:icon_path] || '').gsub('\\', '/'))
+            end
+            dialog.execute_script("window._cmdData = [];")
+            safe_commands.each_slice(100) do |batch|
+              dialog.execute_script("window._cmdData = window._cmdData.concat(#{batch.to_json});")
+            end
+            dialog.execute_script("updateAvailableCommands(window._cmdData);")
           rescue => e
-            puts "CustomToolbar ERROR: #{e.message}"
-            puts e.backtrace.first(5).join("\n")
             dialog.execute_script("loadCommandsError('#{e.message.gsub("'", "\\'")}')")
           end
         end
@@ -98,15 +96,16 @@ module Yoo
         # Get saved toolbar configurations
         dialog.add_action_callback('get_saved_toolbars') do |action_context|
           configs = SettingsStore.load_from_preferences
-          dialog.execute_script("updateSavedToolbars(#{configs.to_json})")
+          safe_configs = configs.map do |c|
+            c.merge(commands: (c[:commands] || []).map { |cmd| cmd.merge(icon_path: (cmd[:icon_path] || '').gsub('\\', '/')) })
+          end
+          dialog.execute_script("updateSavedToolbars(#{safe_configs.to_json})")
         end
 
         # Save toolbar configuration
         dialog.add_action_callback('save_toolbar') do |action_context, config_json|
           begin
-            puts "CustomToolbar: save_toolbar called"
             config = JSON.parse(config_json, symbolize_names: true)
-            puts "CustomToolbar: Saving toolbar '#{config[:name]}' with #{config[:commands].length} commands"
             
             # Load existing configs, update or add new
             configs = SettingsStore.load_from_preferences
@@ -119,14 +118,10 @@ module Yoo
             end
             
             SettingsStore.save_to_preferences(configs)
-            puts "CustomToolbar: Creating toolbar..."
             ToolbarManager.create_or_update_toolbar(config)
-            puts "CustomToolbar: Toolbar created successfully"
             
             dialog.execute_script("saveSuccess('#{config[:name]}')")
           rescue => e
-            puts "CustomToolbar ERROR saving: #{e.message}"
-            puts e.backtrace.first(5).join("\n")
             dialog.execute_script("saveError('#{e.message.gsub("'", "\\'")}')")
           end
         end
@@ -210,6 +205,7 @@ module Yoo
 
       # HTML content for the dialog
       def self.html_content
+        default_icon = File.join(File.dirname(__FILE__), '..', 'icons', 'default_command.svg').gsub('\\', '/')
         <<-HTML
 <!DOCTYPE html>
 <html>
@@ -323,10 +319,18 @@ module Yoo
       border-color: #2196f3;
     }
     .command-item input[type="checkbox"] {
-      margin-right: 10px;
+      margin-right: 8px;
       cursor: pointer;
+      flex-shrink: 0;
     }
-    .command-info { flex: 1; }
+    .cmd-icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 8px;
+      flex-shrink: 0;
+      object-fit: contain;
+    }
+    .command-info { flex: 1; min-width: 0; }
     .command-name {
       font-weight: 500;
       font-size: 13px;
@@ -383,9 +387,32 @@ module Yoo
       cursor: move;
       font-size: 16px;
     }
-    .selected-item .item-name {
+    .selected-item .item-icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 8px;
+      flex-shrink: 0;
+      object-fit: contain;
+    }
+    .selected-item .item-info {
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .selected-item .item-name {
       font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .selected-item .item-subname {
+      font-size: 11px;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .selected-item .remove-btn {
       color: #e74c3c;
@@ -394,27 +421,33 @@ module Yoo
       cursor: pointer;
       font-size: 16px;
       padding: 4px 8px;
+      flex-shrink: 0;
     }
     .selected-item .remove-btn:hover { color: #c0392b; }
-    
-    .order-buttons {
-      display: flex;
-      flex-direction: column;
-      margin-left: 8px;
+    .drop-indicator {
+      height: 2px;
+      background: #3498db;
+      border-radius: 2px;
+      margin: -1px 0;
+      pointer-events: none;
+      display: none;
     }
-    .order-buttons button {
-      background: #ecf0f1;
+    .drop-indicator.active { display: block; }
+    .selected-item.separator {
+      background: none;
       border: none;
+      border-top: 2px dashed #bbb;
       padding: 4px 8px;
-      margin: 1px 0;
-      cursor: pointer;
-      font-size: 11px;
-      border-radius: 3px;
+      justify-content: space-between;
     }
-    .order-buttons button:hover { background: #d5dbdb; }
-    .order-buttons button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
+    .selected-item.separator .sep-label {
+      flex: 1;
+      text-align: center;
+      font-size: 11px;
+      color: #aaa;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      pointer-events: none;
     }
     
     .panel-footer {
@@ -558,6 +591,7 @@ module Yoo
       </div>
       <div class="panel-footer">
         <button class="btn-danger" onclick="clearSelection()">Clear All</button>
+        <button class="btn-secondary" onclick="addSeparator()">+ Separator</button>
         <button class="btn-primary" onclick="saveToolbar()">Save Toolbar</button>
       </div>
     </div>
@@ -579,14 +613,25 @@ module Yoo
     let selectedCommands = [];
     let savedToolbars = [];
     let currentToolbarName = '';
+    var DEFAULT_ICON = '#{default_icon}';
+    var dragSrcIndex = null;
+    var dropTargetIndex = null;
 
-    // Fallback: if no data arrives within 5 seconds, show error
+    // Pull data from Ruby once DOM is ready - avoids execute_script race condition
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof sketchup !== 'undefined') {
+        sketchup.get_available_commands();
+        sketchup.get_saved_toolbars();
+      }
+    });
+
+    // Fallback: if no data arrives within 8 seconds, show error
     setTimeout(function() {
       if (availableCommands.length === 0) {
         document.getElementById('availableList').innerHTML =
           '<div class="empty-state"><p>No commands loaded.<br>Check Ruby Console for errors.</p></div>';
       }
-    }, 5000);
+    }, 8000);
 
     // Update available commands from Ruby
     function updateAvailableCommands(commands) {
@@ -616,7 +661,8 @@ module Yoo
         
         var filtered = availableCommands.filter(function(cmd) {
           return cmd.name.toLowerCase().includes(searchTerm) ||
-            (cmd.tooltip && cmd.tooltip.toLowerCase().includes(searchTerm));
+            (cmd.tooltip && cmd.tooltip.toLowerCase().includes(searchTerm)) ||
+            (cmd.source_toolbar && cmd.source_toolbar !== 'Unknown' && cmd.source_toolbar.toLowerCase().includes(searchTerm));
         });
 
         if (filtered.length === 0) {
@@ -627,11 +673,14 @@ module Yoo
         var html = '';
         for (var i = 0; i < filtered.length; i++) {
           var cmd = filtered[i];
-          html += '<div class="command-item" data-id="' + cmd.id + '">' +
-            '<input type="checkbox" value="' + cmd.id + '" onchange="toggleSelection(this)">' +
+          var iconHtml = '<img class="cmd-icon" src="' + (cmd.icon_path || DEFAULT_ICON) + '">';
+          var sourceLine = (cmd.source_toolbar && cmd.source_toolbar !== 'Unknown') ? cmd.source_toolbar : '';
+          html += '<div class="command-item" data-id="' + cmd.command_ref + '">' +
+            '<input type="checkbox" value="' + cmd.command_ref + '" onchange="toggleSelection(this)">' +
+            iconHtml +
             '<div class="command-info">' +
-              '<div class="command-name">' + escapeHtml(cmd.name) + '</div>' +
-              '<div class="command-source">' + escapeHtml(cmd.source_toolbar || 'Unknown') + '</div>' +
+              (sourceLine ? '<div class="command-name">' + escapeHtml(sourceLine) + '</div>' : '') +
+              '<div class="command-source">' + escapeHtml(cmd.name) + '</div>' +
             '</div>' +
           '</div>';
         }
@@ -655,30 +704,107 @@ module Yoo
       }
 
       list.innerHTML = selectedCommands.map(function(cmd, index) {
-        return '<div class="selected-item" data-index="' + index + '">' +
+        if (cmd.is_separator) {
+          return '<div class="selected-item separator" draggable="true" data-index="' + index + '">' +
+            '<span class="sep-label">separator</span>' +
+            '<button class="remove-btn" data-index="' + index + '">×</button>' +
+          '</div>';
+        }
+        var iconHtml = '<img class="item-icon" src="' + (cmd.icon_path || DEFAULT_ICON) + '">';
+        var sourceLine = (cmd.source_toolbar && cmd.source_toolbar !== 'Unknown') ? cmd.source_toolbar : '';
+        return '<div class="selected-item" draggable="true" data-index="' + index + '">' +
           '<span class="drag-handle">☰</span>' +
-          '<span class="item-name">' + escapeHtml(cmd.name) + '</span>' +
-          '<div class="order-buttons">' +
-            '<button class="btn-move-up" data-index="' + index + '" ' + (index === 0 ? 'disabled' : '') + '>▲</button>' +
-            '<button class="btn-move-down" data-index="' + index + '" ' + (index === selectedCommands.length - 1 ? 'disabled' : '') + '>▼</button>' +
+          iconHtml +
+          '<div class="item-info">' +
+            (sourceLine ? '<div class="item-name">' + escapeHtml(sourceLine) + '</div>' : '') +
+            '<div class="item-subname">' + escapeHtml(cmd.name) + '</div>' +
           '</div>' +
           '<button class="remove-btn" data-index="' + index + '">×</button>' +
         '</div>';
       }).join('');
 
-      // Event delegation for selected list
+      // Click handler for remove
       list.onclick = function(e) {
         var target = e.target;
-        var idx = parseInt(target.getAttribute('data-index'));
-        if (isNaN(idx)) return;
-        if (target.classList.contains('btn-move-up')) {
-          moveItem(idx, -1);
-        } else if (target.classList.contains('btn-move-down')) {
-          moveItem(idx, 1);
-        } else if (target.classList.contains('remove-btn')) {
-          removeItem(idx);
+        if (target.classList.contains('remove-btn')) {
+          var idx = parseInt(target.getAttribute('data-index'));
+          if (!isNaN(idx)) removeItem(idx);
         }
       };
+
+      // Drag-and-drop reordering — dragSrcIndex/dropTargetIndex are module-level
+      // so closures always share the same binding across re-renders
+      var allItems = Array.prototype.slice.call(list.querySelectorAll('.selected-item'));
+
+      // Insert indicator divs between items
+      var indicators = [];
+      allItems.forEach(function(item) {
+        var ind = document.createElement('div');
+        ind.className = 'drop-indicator';
+        list.insertBefore(ind, item);
+        indicators.push(ind);
+      });
+      var endInd = document.createElement('div');
+      endInd.className = 'drop-indicator';
+      list.appendChild(endInd);
+      indicators.push(endInd);
+
+      function clearIndicators() {
+        indicators.forEach(function(ind) { ind.classList.remove('active'); });
+        dropTargetIndex = null;
+      }
+
+      function getInsertIndex(clientY) {
+        for (var i = 0; i < allItems.length; i++) {
+          var rect = allItems[i].getBoundingClientRect();
+          if (clientY < rect.top + rect.height / 2) return i;
+        }
+        return allItems.length;
+      }
+
+      // dragstart / dragend via event delegation on the list
+      list.addEventListener('dragstart', function(e) {
+        var item = e.target.closest('.selected-item');
+        if (!item) return;
+        dragSrcIndex = parseInt(item.getAttribute('data-index'));
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(function() { item.style.opacity = '0.4'; }, 0);
+      });
+
+      list.addEventListener('dragend', function(e) {
+        var item = e.target.closest('.selected-item');
+        if (item) item.style.opacity = '';
+        clearIndicators();
+      });
+
+      list.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var idx = getInsertIndex(e.clientY);
+        if (idx !== dropTargetIndex) {
+          clearIndicators();
+          dropTargetIndex = idx;
+          if (indicators[idx]) indicators[idx].classList.add('active');
+        }
+      });
+
+      list.addEventListener('dragleave', function(e) {
+        if (!list.contains(e.relatedTarget)) clearIndicators();
+      });
+
+      list.addEventListener('drop', function(e) {
+        e.preventDefault();
+        var src = dragSrcIndex;
+        var dst = dropTargetIndex;
+        clearIndicators();
+        dragSrcIndex = null;
+        if (src === null || dst === null) return;
+        var insertAt = dst > src ? dst - 1 : dst;
+        if (insertAt === src) return;
+        var moved = selectedCommands.splice(src, 1)[0];
+        selectedCommands.splice(insertAt, 0, moved);
+        renderSelectedList();
+      });
     }
 
     // Render saved toolbars list
@@ -726,15 +852,15 @@ module Yoo
 
     // Toggle command selection
     function toggleSelection(checkbox) {
-      var cmdId = checkbox.value;
-      var command = availableCommands.find(function(c) { return c.id === cmdId; });
+      var cmdRef = checkbox.value;
+      var command = availableCommands.find(function(c) { return c.command_ref === cmdRef; });
       
       if (checkbox.checked && command) {
-        if (!selectedCommands.find(function(c) { return c.id === cmdId; })) {
+        if (!selectedCommands.find(function(c) { return c.command_ref === cmdRef; })) {
           selectedCommands.push(command);
         }
       } else {
-        selectedCommands = selectedCommands.filter(function(c) { return c.id !== cmdId; });
+        selectedCommands = selectedCommands.filter(function(c) { return c.command_ref !== cmdRef; });
       }
       renderSelectedList();
     }
@@ -743,9 +869,9 @@ module Yoo
     function addSelectedCommands() {
       var checkboxes = document.querySelectorAll('#availableList input[type="checkbox"]:checked');
       checkboxes.forEach(function(cb) {
-        var cmdId = cb.value;
-        var command = availableCommands.find(function(c) { return c.id === cmdId; });
-        if (command && !selectedCommands.find(function(c) { return c.id === cmdId; })) {
+        var cmdRef = cb.value;
+        var command = availableCommands.find(function(c) { return c.command_ref === cmdRef; });
+        if (command && !selectedCommands.find(function(c) { return c.command_ref === cmdRef; })) {
           selectedCommands.push(command);
         }
       });
@@ -755,14 +881,14 @@ module Yoo
       checkboxes.forEach(function(cb) { cb.checked = false; });
     }
 
-    // Move item up or down
-    function moveItem(index, direction) {
-      var newIndex = index + direction;
-      if (newIndex < 0 || newIndex >= selectedCommands.length) return;
-      
-      var temp = selectedCommands[index];
-      selectedCommands[index] = selectedCommands[newIndex];
-      selectedCommands[newIndex] = temp;
+    // Add a separator into the selected commands list
+    function addSeparator() {
+      selectedCommands.push({
+        id: '__separator__',
+        command_ref: '__sep_' + Date.now() + '__',
+        name: '— Separator —',
+        is_separator: true
+      });
       renderSelectedList();
     }
 
@@ -802,6 +928,7 @@ module Yoo
         commands: selectedCommands.map(function(cmd) {
           return {
             id: cmd.id,
+            command_ref: cmd.command_ref,
             name: cmd.name,
             tooltip: cmd.tooltip,
             status_bar_text: cmd.status_bar_text,

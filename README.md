@@ -1,79 +1,94 @@
 # Custom Toolbar Builder for SketchUp
 
-A SketchUp extension that allows you to build custom toolbars using buttons from existing extensions. Similar to Fredo LordofToolbars but simpler and more focused.
+A SketchUp extension that lets you build custom toolbars from buttons of any loaded extension. Similar to Fredo LordofToolbars but simpler and more focused.
 
 ## Features
 
-- **Select Commands**: Choose buttons from existing extensions that are currently loaded
-- **Reorder**: Arrange buttons in your preferred order
-- **Import/Export**: Save and share toolbar configurations as JSON files
-- **Multiple Toolbars**: Create as many custom toolbars as you need
-- **Persistent**: Toolbars are restored automatically when SketchUp starts
+- **Browse commands** from all loaded extensions, with icons and plugin names
+- **Search** by command name, tooltip, or plugin/source name
+- **Icons displayed** in both the available list and the selected list; commands without icons show a neutral default icon
+- **Drag-and-drop reorder** selected commands with a visual drop-indicator between items
+- **Separators** — insert visual group separators between toolbar buttons via the *+ Separator* button
+- **Multiple toolbars** — create as many custom toolbars as needed
+- **Persistent** — toolbars are saved to a JSON file and restored automatically on SketchUp startup
+- **Import/Export** — share toolbar configurations as JSON files
 
 ## Installation
 
-1. Copy the `Yoo_CustomToolbar` folder to your SketchUp Plugins directory:
-   - Windows: `%APPDATA%/SketchUp/SketchUp 2024/SketchUp/Plugins/`
+1. Copy the `src/` contents to your SketchUp Plugins directory:
+   - Windows: `%APPDATA%\SketchUp\SketchUp 2024\SketchUp\Plugins\`
    - Mac: `~/Library/Application Support/SketchUp 2024/SketchUp/Plugins/`
 
 2. Restart SketchUp
 
-3. The extension will appear under **Extensions > Custom Toolbar Builder**
+3. The extension appears under **Extensions > Yoo Custom Toolbar**
 
 ## Usage
 
 ### Building a Custom Toolbar
 
-1. Go to **Extensions > Custom Toolbar Builder > Build Custom Toolbar...**
-2. Select commands from the left panel (Available Commands)
-3. Click "Add Selected" to add them to your toolbar
-4. Enter a name for your toolbar
-5. Use the up/down arrows to reorder commands
-6. Click "Save Toolbar"
+1. Go to **Extensions > Yoo Custom Toolbar > Build Custom Toolbar...**
+2. Browse or search the **Available Commands** panel on the left
+3. Check commands to select them, then click **Add Selected**
+4. Optionally click **+ Separator** to insert a separator at the current end of the list
+5. Drag items up or down to reorder — a blue line shows where the item will land
+6. Enter a name in the **Toolbar Name** field
+7. Click **Save Toolbar**
 
-Your custom toolbar will appear in SketchUp and be restored on startup.
+Your custom toolbar appears in SketchUp immediately and is restored on every startup.
 
 ### Managing Toolbars
 
-- **Show/Hide**: Click the eye icon next to a saved toolbar
-- **Edit**: Click on a saved toolbar name to edit its contents
+- **Edit**: Click a saved toolbar name to reload it into the builder
 - **Delete**: Click the trash icon to remove a toolbar
 
 ### Import/Export
 
-- **Export**: Saves all your custom toolbar configurations to a JSON file
-- **Import**: Loads toolbar configurations from a JSON file (replaces existing toolbars)
+- **Export**: Saves all toolbar configurations to a JSON file
+- **Import**: Loads configurations from a JSON file
 
-Access these via the **Extensions > Custom Toolbar Builder** menu or the Import/Export buttons in the dialog.
+Access via **Extensions > Yoo Custom Toolbar** menu or the Import/Export buttons in the dialog.
 
 ## How It Works
 
-The extension discovers commands by:
-1. Scanning all loaded `UI::Toolbar` instances
-2. Collecting `UI::Command` objects from ObjectSpace
-3. Building a registry of available commands with their icons and tooltips
+**Command discovery** — on opening the builder the extension:
+1. Scans `ObjectSpace` for all live `UI::Command` instances
+2. Augments with commands from known extension modules
+3. Deduplicates by Ruby `object_id` so commands with identical names from different plugins are all listed separately
 
-When you create a toolbar, the extension:
-1. Attempts to find existing matching commands (by name/tooltip/icon)
-2. Falls back to creating placeholder commands if the original extension isn't loaded
-3. Stores your configuration in SketchUp preferences and restores it on startup
+**Command display** — each item shows:
+- Plugin/source name as the primary (bold) title
+- Command name as the secondary line
+- The command's own icon, or a neutral default if none is set
+
+**Toolbar restoration** — on startup:
+1. First tries to match saved commands by `object_id` (same session)
+2. Falls back to fuzzy matching by tooltip or icon filename (cross-session)
+3. Creates a placeholder button if the source extension is not loaded
+4. Assigns the default icon to any button that has no icon
 
 ## File Structure
 
 ```
 Yoo_CustomToolbar/
 ├── src/
-│   ├── Yoo_CustomToolbar.rb              # Extension loader
+│   ├── Yoo_CustomToolbar.rb              # Extension entry point
+│   ├── icons/
+│   │   ├── toolbar_builder.svg           # Builder button icon
+│   │   └── default_command.svg           # Fallback icon for iconless commands
 │   └── yoo_custom_toolbar/
-│       ├── main.rb                        # Entry point
-│       ├── command_scanner.rb             # Discovers available commands
-│       ├── toolbar_manager.rb             # Creates/manages toolbars
-│       ├── settings_store.rb              # JSON import/export & persistence
-│       └── toolbar_builder_dialog.rb      # HtmlDialog UI
+│       ├── main.rb                        # Loads extension, restores toolbars
+│       ├── command_scanner.rb             # Discovers and deduplicates commands
+│       ├── toolbar_manager.rb             # Creates/restores UI::Toolbar instances
+│       ├── settings_store.rb              # File-based JSON persistence & import/export
+│       └── toolbar_builder_dialog.rb      # HtmlDialog UI (HTML/CSS/JS embedded)
 └── README.md
 ```
 
 ## Configuration Format
+
+Toolbar configs are stored in:
+`%APPDATA%\SketchUp\SketchUp 2024\SketchUp\Plugins\yoo_custom_toolbar_data\toolbars.json`
 
 Exported JSON files have this structure:
 
@@ -87,10 +102,15 @@ Exported JSON files have this structure:
       "commands": [
         {
           "id": "abc123",
+          "command_ref": "70234567890",
           "name": "BOQ Manager",
           "tooltip": "Open BOQ Manager",
-          "icon_path": "...",
+          "icon_path": "/path/to/icon.svg",
           "source_toolbar": "Yoo Estimator"
+        },
+        {
+          "id": "__separator__",
+          "is_separator": true
         }
       ]
     }
@@ -100,11 +120,13 @@ Exported JSON files have this structure:
 
 ## Limitations
 
-- Commands are discovered from loaded extensions only
-- Some extensions may not expose their commands in a detectable way
-- Icon paths are stored but may need manual adjustment if extensions move
-- SketchUp API doesn't allow destroying toolbars, only hiding them
+- Commands are discovered from currently loaded extensions only
+- Some extensions may not expose their commands detectably
+- SketchUp API does not support destroying toolbars — deleted toolbars are hidden only
+- Icon paths are absolute; portability between machines requires re-saving the toolbar
 
 ## License
 
-Copyright 2026 Jure Judez
+MIT License — see [LICENSE](LICENSE) for details.
+
+Copyright (c) 2026 Jure Judez

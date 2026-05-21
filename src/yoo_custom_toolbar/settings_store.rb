@@ -7,8 +7,21 @@ module Yoo
   module CustomToolbar
     # Handles JSON serialization and SketchUp preferences storage
     module SettingsStore
-      PREFERENCES_KEY = 'YooCustomToolbar'.freeze
       CONFIG_VERSION = 1
+
+      def self.config_dir
+        dir = File.join(Sketchup.find_support_file('Plugins'), 'yoo_custom_toolbar_data')
+        Dir.mkdir(dir) unless Dir.exist?(dir)
+        dir
+      end
+
+      def self.config_file
+        File.join(config_dir, 'toolbar_configs.json')
+      end
+
+      def self.prefs_file
+        File.join(config_dir, 'prefs.json')
+      end
 
       # Export toolbar configuration to JSON file
       def self.export_config(toolbar_configs, file_path)
@@ -20,7 +33,6 @@ module Yoo
         File.write(file_path, JSON.pretty_generate(data))
         true
       rescue => e
-        puts "Error exporting config: #{e.message}"
         false
       end
 
@@ -33,36 +45,44 @@ module Yoo
 
         data[:toolbars]
       rescue => e
-        puts "Error importing config: #{e.message}"
         nil
       end
 
-      # Save toolbar configurations to SketchUp preferences
+      # Save toolbar configurations to a JSON file on disk
       def self.save_to_preferences(toolbar_configs)
-        Sketchup.write_default(PREFERENCES_KEY, 'toolbar_configs', toolbar_configs.to_json)
+        File.write(config_file, toolbar_configs.to_json)
       rescue => e
-        puts "Error saving to preferences: #{e.message}"
+        # ignore
       end
 
-      # Load toolbar configurations from SketchUp preferences
+      # Load toolbar configurations from JSON file on disk
       def self.load_from_preferences
-        json = Sketchup.read_default(PREFERENCES_KEY, 'toolbar_configs', nil)
-        return [] unless json
+        return [] unless File.exist?(config_file)
+
+        json = File.read(config_file)
+        return [] if json.nil? || json.strip.empty?
 
         JSON.parse(json, symbolize_names: true)
       rescue => e
-        puts "Error loading from preferences: #{e.message}"
         []
       end
 
       # Get the last used import/export directory
       def self.last_directory
-        Sketchup.read_default(PREFERENCES_KEY, 'last_directory', Dir.home)
+        return Dir.home unless File.exist?(prefs_file)
+
+        data = JSON.parse(File.read(prefs_file), symbolize_names: true)
+        data[:last_directory] || Dir.home
+      rescue => e
+        Dir.home
       end
 
       # Save the last used import/export directory
       def self.save_last_directory(dir)
-        Sketchup.write_default(PREFERENCES_KEY, 'last_directory', dir)
+        existing = File.exist?(prefs_file) ? JSON.parse(File.read(prefs_file), symbolize_names: true) : {}
+        File.write(prefs_file, existing.merge(last_directory: dir).to_json)
+      rescue => e
+        # ignore
       end
     end
   end

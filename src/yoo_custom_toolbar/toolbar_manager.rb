@@ -24,8 +24,12 @@ module Yoo
 
         # Add commands to toolbar
         (config[:commands] || []).each do |cmd_config|
-          command = find_or_create_command(cmd_config)
-          toolbar.add_item(command) if command
+          if cmd_config[:is_separator] || cmd_config[:id] == '__separator__'
+            toolbar.add_separator
+          else
+            command = find_or_create_command(cmd_config)
+            toolbar.add_item(command) if command
+          end
         end
 
         # Store reference
@@ -64,11 +68,26 @@ module Yoo
         @custom_toolbars.keys
       end
 
+      def self.default_icon_path
+        File.join(File.dirname(__FILE__), '..', 'icons', 'default_command.svg')
+      end
+
       # Find or create a command based on stored configuration
       def self.find_or_create_command(cmd_config)
         # Try to find existing command by reference
         existing_cmd = find_existing_command(cmd_config)
-        return existing_cmd if existing_cmd
+        if existing_cmd
+          # Apply default icon if the real command has none
+          if (existing_cmd.small_icon.nil? || existing_cmd.small_icon.empty?) &&
+             (existing_cmd.large_icon.nil? || existing_cmd.large_icon.empty?)
+            icon = default_icon_path
+            if File.exist?(icon)
+              existing_cmd.small_icon = icon
+              existing_cmd.large_icon = icon
+            end
+          end
+          return existing_cmd
+        end
 
         # If not found, create a placeholder command that shows info
         create_placeholder_command(cmd_config)
@@ -77,30 +96,46 @@ module Yoo
       # Attempt to find an existing command in ObjectSpace
       def self.find_existing_command(cmd_config)
         begin
+          ref_oid = cmd_config[:command_ref].to_i if cmd_config[:command_ref]
+
+          ObjectSpace.each_object(UI::Command) do |cmd|
+            # Primary: match by object_id (same session)
+            return cmd if ref_oid && ref_oid > 0 && cmd.object_id == ref_oid
+          end
+
+          # Fallback: fuzzy match by name/tooltip/icon (cross-session restores)
           ObjectSpace.each_object(UI::Command) do |cmd|
             return cmd if command_matches?(cmd, cmd_config)
           end
         rescue => e
-          puts "CustomToolbar: Error searching for existing command: #{e.message}"
+          # ignore
         end
         nil
       end
 
       # Check if a command matches the stored configuration
       def self.command_matches?(command, cmd_config)
-        # Match by menu text
-        return true if command.menu_text && command.menu_text == cmd_config[:name]
-        
+        # Match by menu text + source toolbar to avoid cross-plugin collisions
+        if command.menu_text && command.menu_text == cmd_config[:name]
+          src = cmd_config[:source_toolbar]
+          return true if src.nil? || src.empty? || src == 'Unknown'
+          icon = command.small_icon || command.large_icon || ''
+          return true if icon.gsub('\\', '/').include?(src.gsub(' ', '_')) ||
+                         icon.gsub('\\', '/').include?(src.gsub(' ', ''))
+          return true # name match is good enough as last resort
+        end
+
         # Match by tooltip
-        return true if command.tooltip && command.tooltip == cmd_config[:tooltip]
-        
+        return true if command.tooltip && !command.tooltip.empty? &&
+                       command.tooltip == cmd_config[:tooltip]
+
         # Match by icon path (base name)
         if cmd_config[:icon_path] && !cmd_config[:icon_path].empty?
           cmd_icon = File.basename(cmd_config[:icon_path])
           existing_icon = File.basename(command.small_icon || command.large_icon || '')
-          return true if cmd_icon == existing_icon
+          return true if !cmd_icon.empty? && cmd_icon == existing_icon
         end
-        
+
         false
       end
 
@@ -114,12 +149,17 @@ module Yoo
         cmd.status_bar_text = cmd_config[:status_bar_text] || "Command not available"
         cmd.menu_text = cmd_config[:name] || 'Unknown'
         
-        # Try to set icon if path exists
-        if cmd_config[:icon_path] && File.exist?(cmd_config[:icon_path])
-          cmd.small_icon = cmd_config[:icon_path]
-          cmd.large_icon = cmd_config[:icon_path]
+        # Use saved icon path, fall back to default icon
+        icon = if cmd_config[:icon_path] && !cmd_config[:icon_path].empty? && File.exist?(cmd_config[:icon_path])
+          cmd_config[:icon_path]
+        else
+          default_icon_path
         end
-        
+        if File.exist?(icon)
+          cmd.small_icon = icon
+          cmd.large_icon = icon
+        end
+
         cmd
       end
 
