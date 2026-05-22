@@ -208,191 +208,403 @@ module Yoo
         default_icon = File.join(File.dirname(__FILE__), '..', 'icons', 'default_command.svg').gsub('\\', '/')
         <<-HTML
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ── Modus design tokens (subset from modus-wc-styles) ── */
+    :root {
+      --m-white:        #ffffff;
+      --m-gray-light:   #f1f1f6;
+      --m-gray-01:      #f5f5f8;
+      --m-gray-02:      #e9eaf0;
+      --m-gray-0:       #e0e1e9;
+      --m-gray-1:       #cbcdd6;
+      --m-gray-2:       #b7b9c3;
+      --m-gray-5:       #7d808d;
+      --m-gray-6:       #6a6e79;
+      --m-gray-7:       #585c65;
+      --m-gray-8:       #464b52;
+      --m-gray-9:       #353a40;
+      --m-gray-10:      #171c1e;
+      --m-trimble-gray: #252a2e;
+      --m-blue-pale:    #dcedf9;
+      --m-blue-light:   #217cbb;
+      --m-trimble-blue: #0063a3;
+      --m-blue-dark:    #0e416c;
+      --m-red:          #da212c;
+      --m-red-light:    #e86363;
+      --m-red-pale:     #fbd4d7;
+      --m-green:        #1e8a44;
+      --m-green-pale:   #e0eccf;
+      --m-yellow:       #fbad26;
+
+      --m-font:         'Segoe UI', 'San Francisco', 'Helvetica Neue', Arial, sans-serif;
+      --m-fs-xs:        0.625rem;
+      --m-fs-sm:        0.75rem;
+      --m-fs-md:        0.875rem;
+      --m-fs-lg:        1rem;
+
+      --m-fw-normal:    400;
+      --m-fw-semi:      600;
+      --m-fw-bold:      700;
+
+      --m-sp-2xs:       0.125rem;
+      --m-sp-xs:        0.25rem;
+      --m-sp-sm:        0.5rem;
+      --m-sp-md:        0.75rem;
+      --m-sp-lg:        1rem;
+      --m-sp-xl:        1.5rem;
+
+      --m-radius-sm:    2px;
+      --m-radius-md:    4px;
+      --m-radius-lg:    8px;
+      --m-radius-btn:   var(--m-radius-lg);
+      --m-radius-input: var(--m-radius-lg);
+      --m-radius-card:  var(--m-radius-lg);
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
+      font-family: var(--m-font);
+      font-size: var(--m-fs-md);
+      font-weight: var(--m-fw-normal);
+      color: var(--m-gray-10);
+      background: var(--m-gray-01);
       height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
-    .header {
-      background: #2c3e50;
-      color: white;
-      padding: 15px 20px;
+
+    /* ── App header (Trimble blue nav bar) ── */
+    .app-header {
+      background: var(--m-trimble-blue);
+      color: var(--m-white);
+      height: 48px;
+      padding: 0 var(--m-sp-xl);
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
     }
-    .header h1 { font-size: 18px; font-weight: 500; }
-    .header-buttons button {
-      background: #3498db;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      margin-left: 8px;
-      border-radius: 4px;
+    .app-header-brand {
+      display: flex;
+      align-items: center;
+      gap: var(--m-sp-sm);
+    }
+    .app-header-brand svg {
+      width: 20px; height: 20px; fill: var(--m-white); flex-shrink: 0;
+    }
+    .app-header-title {
+      font-size: var(--m-fs-lg);
+      font-weight: var(--m-fw-semi);
+      letter-spacing: 0.01em;
+    }
+    .app-header-actions {
+      display: flex;
+      gap: var(--m-sp-sm);
+    }
+
+    /* ── Modus buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--m-sp-xs);
+      padding: 0 var(--m-sp-lg);
+      height: 32px;
+      border: 1px solid transparent;
+      border-radius: var(--m-radius-btn);
+      font-family: var(--m-font);
+      font-size: var(--m-fs-md);
+      font-weight: var(--m-fw-semi);
       cursor: pointer;
-      font-size: 13px;
+      white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      text-decoration: none;
     }
-    .header-buttons button:hover { background: #2980b9; }
-    .header-buttons button.import { background: #27ae60; }
-    .header-buttons button.import:hover { background: #229954; }
-    .header-buttons button.export { background: #e67e22; }
-    .header-buttons button.export:hover { background: #d35400; }
-    
+    .btn-primary {
+      background: var(--m-trimble-blue);
+      color: var(--m-white);
+      border-color: var(--m-trimble-blue);
+    }
+    .btn-primary:hover { background: var(--m-blue-dark); border-color: var(--m-blue-dark); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--m-white);
+      border-color: rgba(255,255,255,0.6);
+    }
+    .btn-outline:hover { background: rgba(255,255,255,0.12); border-color: var(--m-white); }
+
+    .btn-tertiary {
+      background: var(--m-gray-01);
+      color: var(--m-gray-8);
+      border-color: var(--m-gray-1);
+    }
+    .btn-tertiary:hover { background: var(--m-gray-02); border-color: var(--m-gray-2); }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--m-red);
+      border-color: var(--m-red);
+    }
+    .btn-danger:hover { background: var(--m-red-pale); }
+
+    /* ── Layout ── */
     .main-content {
       flex: 1;
       display: flex;
-      padding: 15px;
-      gap: 15px;
+      padding: var(--m-sp-lg);
+      gap: var(--m-sp-lg);
       overflow: hidden;
+      min-height: 0;
     }
-    
+
+    /* ── Panel card ── */
     .panel {
-      background: white;
-      border-radius: 6px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      background: var(--m-white);
+      border: 1px solid var(--m-gray-02);
+      border-radius: var(--m-radius-card);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
     }
-    .panel-left { flex: 1; min-width: 300px; }
-    .panel-right { flex: 1; min-width: 300px; }
-    
+    .panel-left  { flex: 1; min-width: 280px; }
+    .panel-right { flex: 1; min-width: 280px; }
+
     .panel-header {
-      background: #ecf0f1;
-      padding: 12px 15px;
-      border-bottom: 1px solid #ddd;
+      background: var(--m-gray-01);
+      border-bottom: 1px solid var(--m-gray-02);
+      padding: var(--m-sp-sm) var(--m-sp-lg);
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
     }
     .panel-header h2 {
-      font-size: 14px;
-      font-weight: 600;
-      color: #2c3e50;
+      font-size: var(--m-fs-sm);
+      font-weight: var(--m-fw-semi);
+      color: var(--m-gray-7);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.06em;
     }
-    
+
+    /* ── Search ── */
     .search-box {
-      padding: 10px 15px;
-      border-bottom: 1px solid #eee;
+      padding: var(--m-sp-sm) var(--m-sp-lg);
+      border-bottom: 1px solid var(--m-gray-02);
+      flex-shrink: 0;
     }
     .search-box input {
       width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-    .search-box input:focus {
+      height: 32px;
+      padding: 0 var(--m-sp-md);
+      border: 1px solid var(--m-gray-1);
+      border-radius: var(--m-radius-input);
+      font-family: var(--m-font);
+      font-size: var(--m-fs-md);
+      color: var(--m-gray-10);
+      background: var(--m-white);
       outline: none;
-      border-color: #3498db;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    
+    .search-box input::placeholder { color: var(--m-gray-5); }
+    .search-box input:focus {
+      border-color: var(--m-trimble-blue);
+      box-shadow: 0 0 0 2px rgba(0,99,163,0.18);
+    }
+
+    /* ── Scrollable list ── */
     .list-container {
       flex: 1;
       overflow-y: auto;
-      padding: 10px;
+      padding: var(--m-sp-sm);
+      min-height: 0;
     }
-    
+    .list-container::-webkit-scrollbar { width: 6px; }
+    .list-container::-webkit-scrollbar-thumb {
+      background: var(--m-gray-1);
+      border-radius: 3px;
+    }
+
+    /* ── Command group header ── */
+    .cmd-group-header {
+      display: flex;
+      align-items: center;
+      gap: var(--m-sp-xs);
+      padding: var(--m-sp-xs) var(--m-sp-sm);
+      margin-top: var(--m-sp-xs);
+      background: var(--m-gray-02);
+      border-radius: var(--m-radius-md);
+      cursor: pointer;
+      user-select: none;
+      font-size: var(--m-fs-xs);
+      font-weight: var(--m-fw-bold);
+      color: var(--m-gray-7);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: none;
+      width: 100%;
+      text-align: left;
+    }
+    .cmd-group-header:hover { background: var(--m-gray-0); }
+    .cmd-group-header .group-chevron {
+      font-size: 10px;
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+    .cmd-group-header.collapsed .group-chevron { transform: rotate(-90deg); }
+    .cmd-group-header .group-count {
+      margin-left: auto;
+      font-weight: var(--m-fw-normal);
+      color: var(--m-gray-5);
+      font-size: var(--m-fs-xs);
+    }
+    .cmd-group-body.collapsed { display: none; }
+
+    /* ── Available command item ── */
     .command-item {
       display: flex;
       align-items: center;
-      padding: 10px;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
-      margin-bottom: 6px;
+      padding: var(--m-sp-sm) var(--m-sp-md);
+      border: 1px solid var(--m-gray-02);
+      border-radius: var(--m-radius-md);
+      margin-bottom: var(--m-sp-xs);
       cursor: pointer;
-      transition: all 0.2s;
-      background: white;
+      background: var(--m-white);
+      transition: background 0.12s, border-color 0.12s;
     }
     .command-item:hover {
-      background: #f8f9fa;
-      border-color: #3498db;
-    }
-    .command-item.selected {
-      background: #e3f2fd;
-      border-color: #2196f3;
+      background: var(--m-gray-01);
+      border-color: var(--m-blue-light);
     }
     .command-item input[type="checkbox"] {
-      margin-right: 8px;
+      width: 16px; height: 16px;
+      margin-right: var(--m-sp-sm);
       cursor: pointer;
       flex-shrink: 0;
+      accent-color: var(--m-trimble-blue);
     }
     .cmd-icon {
-      width: 20px;
-      height: 20px;
-      margin-right: 8px;
+      width: 20px; height: 20px;
+      margin-right: var(--m-sp-sm);
       flex-shrink: 0;
       object-fit: contain;
+      border-radius: 2px;
     }
     .command-info { flex: 1; min-width: 0; }
     .command-name {
-      font-weight: 500;
-      font-size: 13px;
-      color: #333;
-      margin-bottom: 2px;
+      font-size: var(--m-fs-md);
+      font-weight: var(--m-fw-semi);
+      color: var(--m-gray-10);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .command-source {
-      font-size: 11px;
-      color: #666;
+      font-size: var(--m-fs-xs);
+      color: var(--m-gray-6);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    
+
+    /* ── Panel footer ── */
+    .panel-footer {
+      padding: var(--m-sp-sm) var(--m-sp-lg);
+      border-top: 1px solid var(--m-gray-02);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--m-sp-sm);
+      flex-shrink: 0;
+      background: var(--m-gray-01);
+    }
+    .panel-footer-left {
+      font-size: var(--m-fs-sm);
+      color: var(--m-gray-6);
+    }
+    .panel-footer-right {
+      display: flex;
+      gap: var(--m-sp-sm);
+    }
+
+    /* ── Toolbar name input ── */
     .toolbar-config {
-      padding: 15px;
-      border-bottom: 1px solid #eee;
+      padding: var(--m-sp-sm) var(--m-sp-lg);
+      border-bottom: 1px solid var(--m-gray-02);
+      flex-shrink: 0;
     }
     .toolbar-config label {
       display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: #555;
-      margin-bottom: 6px;
+      font-size: var(--m-fs-xs);
+      font-weight: var(--m-fw-semi);
+      color: var(--m-gray-6);
       text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: var(--m-sp-xs);
     }
     .toolbar-config input {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
+      height: 32px;
+      padding: 0 var(--m-sp-md);
+      border: 1px solid var(--m-gray-1);
+      border-radius: var(--m-radius-input);
+      font-family: var(--m-font);
+      font-size: var(--m-fs-md);
+      color: var(--m-gray-10);
+      background: var(--m-white);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
     .toolbar-config input:focus {
-      outline: none;
-      border-color: #3498db;
+      border-color: var(--m-trimble-blue);
+      box-shadow: 0 0 0 2px rgba(0,99,163,0.18);
     }
-    
+
+    /* ── Selected list ── */
     .selected-list {
       flex: 1;
       overflow-y: auto;
-      padding: 10px;
+      padding: var(--m-sp-sm);
+      min-height: 0;
     }
-    
+    .selected-list::-webkit-scrollbar { width: 6px; }
+    .selected-list::-webkit-scrollbar-thumb {
+      background: var(--m-gray-1);
+      border-radius: 3px;
+    }
+
     .selected-item {
       display: flex;
       align-items: center;
-      padding: 12px;
-      background: #f8f9fa;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
-      margin-bottom: 8px;
+      padding: var(--m-sp-xs) var(--m-sp-sm);
+      background: var(--m-gray-01);
+      border: 1px solid var(--m-gray-02);
+      border-radius: var(--m-radius-md);
+      margin-bottom: var(--m-sp-xs);
+      gap: var(--m-sp-xs);
+      min-height: 40px;
     }
     .selected-item .drag-handle {
-      color: #999;
-      margin-right: 10px;
-      cursor: move;
-      font-size: 16px;
+      color: var(--m-gray-2);
+      cursor: grab;
+      font-size: 14px;
+      flex-shrink: 0;
+      padding: 0 var(--m-sp-2xs);
+      user-select: none;
     }
+    .selected-item .drag-handle:active { cursor: grabbing; }
     .selected-item .item-icon {
-      width: 20px;
-      height: 20px;
-      margin-right: 8px;
+      width: 18px; height: 18px;
       flex-shrink: 0;
       object-fit: contain;
+      border-radius: 2px;
     }
     .selected-item .item-info {
       flex: 1;
@@ -400,202 +612,235 @@ module Yoo
       overflow: hidden;
     }
     .selected-item .item-name {
-      font-size: 13px;
-      font-weight: 500;
-      color: #333;
+      font-size: var(--m-fs-md);
+      font-weight: var(--m-fw-semi);
+      color: var(--m-gray-9);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .selected-item .item-subname {
-      font-size: 11px;
-      color: #666;
+      font-size: var(--m-fs-xs);
+      color: var(--m-gray-5);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .selected-item .remove-btn {
-      color: #e74c3c;
       background: none;
       border: none;
+      color: var(--m-gray-5);
       cursor: pointer;
       font-size: 16px;
-      padding: 4px 8px;
+      padding: 0 var(--m-sp-2xs);
       flex-shrink: 0;
+      line-height: 1;
+      border-radius: var(--m-radius-sm);
+      transition: color 0.12s, background 0.12s;
     }
-    .selected-item .remove-btn:hover { color: #c0392b; }
+    .selected-item .remove-btn:hover {
+      color: var(--m-red);
+      background: var(--m-red-pale);
+    }
+
+    /* ── Drop indicator ── */
     .drop-indicator {
       height: 2px;
-      background: #3498db;
-      border-radius: 2px;
+      background: var(--m-trimble-blue);
+      border-radius: 1px;
       margin: -1px 0;
       pointer-events: none;
       display: none;
+      box-shadow: 0 0 4px rgba(0,99,163,0.4);
     }
     .drop-indicator.active { display: block; }
+
+    /* ── Separator item ── */
     .selected-item.separator {
-      background: none;
+      background: transparent;
       border: none;
-      border-top: 2px dashed #bbb;
-      padding: 4px 8px;
+      border-top: 2px dashed var(--m-gray-1);
+      border-radius: 0;
+      padding: var(--m-sp-xs) var(--m-sp-sm);
+      min-height: 24px;
       justify-content: space-between;
     }
     .selected-item.separator .sep-label {
       flex: 1;
       text-align: center;
-      font-size: 11px;
-      color: #aaa;
-      letter-spacing: 1px;
+      font-size: var(--m-fs-xs);
+      font-weight: var(--m-fw-semi);
+      color: var(--m-gray-2);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       pointer-events: none;
     }
-    
-    .panel-footer {
-      padding: 12px 15px;
-      border-top: 1px solid #ddd;
-      display: flex;
-      justify-content: space-between;
-    }
-    .panel-footer button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .btn-primary {
-      background: #3498db;
-      color: white;
-    }
-    .btn-primary:hover { background: #2980b9; }
-    .btn-danger {
-      background: #e74c3c;
-      color: white;
-    }
-    .btn-danger:hover { background: #c0392b; }
-    .btn-secondary {
-      background: #95a5a6;
-      color: white;
-    }
-    .btn-secondary:hover { background: #7f8c8d; }
-    
+
+    /* ── Saved toolbars panel ── */
     .saved-toolbars {
-      width: 250px;
-      background: white;
-      border-radius: 6px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      width: 230px;
+      background: var(--m-white);
+      border: 1px solid var(--m-gray-02);
+      border-radius: var(--m-radius-card);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      flex-shrink: 0;
     }
-    
+
     .toolbar-list-item {
-      padding: 12px 15px;
-      border-bottom: 1px solid #eee;
+      padding: var(--m-sp-sm) var(--m-sp-lg);
+      border-bottom: 1px solid var(--m-gray-01);
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      transition: background 0.12s;
     }
-    .toolbar-list-item:hover { background: #f8f9fa; }
+    .toolbar-list-item:hover { background: var(--m-gray-01); }
     .toolbar-list-item.active {
-      background: #e3f2fd;
-      border-left: 3px solid #2196f3;
+      background: var(--m-blue-pale);
+      border-left: 3px solid var(--m-trimble-blue);
+      padding-left: calc(var(--m-sp-lg) - 3px);
     }
     .toolbar-list-item .toolbar-name {
-      font-weight: 500;
-      font-size: 13px;
+      font-size: var(--m-fs-md);
+      font-weight: var(--m-fw-semi);
+      color: var(--m-gray-9);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .toolbar-list-item .toolbar-actions {
+      display: flex;
+      gap: var(--m-sp-2xs);
+      flex-shrink: 0;
     }
     .toolbar-list-item .toolbar-actions button {
       background: none;
       border: none;
       cursor: pointer;
-      font-size: 13px;
-      padding: 2px 6px;
-      margin-left: 4px;
-      color: #666;
+      font-size: 14px;
+      padding: 2px 4px;
+      color: var(--m-gray-5);
+      border-radius: var(--m-radius-sm);
+      transition: color 0.12s, background 0.12s;
     }
-    .toolbar-list-item .toolbar-actions button:hover { color: #333; }
-    
+    .toolbar-list-item .toolbar-actions button:hover {
+      color: var(--m-gray-9);
+      background: var(--m-gray-02);
+    }
+
+    /* ── Empty state ── */
     .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--m-sp-xl) var(--m-sp-lg);
+      color: var(--m-gray-5);
       text-align: center;
-      padding: 40px;
-      color: #999;
+      gap: var(--m-sp-sm);
     }
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 15px;
-    }
-    
+    .empty-state-icon { font-size: 36px; opacity: 0.4; }
+    .empty-state p { font-size: var(--m-fs-sm); line-height: 1.5; }
+
+    /* ── Toast notification ── */
     .status-message {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      padding: 12px 20px;
-      border-radius: 4px;
-      color: white;
-      font-size: 13px;
-      animation: slideIn 0.3s ease;
+      padding: var(--m-sp-sm) var(--m-sp-lg);
+      border-radius: var(--m-radius-md);
+      font-size: var(--m-fs-md);
+      font-weight: var(--m-fw-semi);
+      animation: slideIn 0.2s ease;
       z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      max-width: 320px;
     }
-    .status-message.success { background: #27ae60; }
-    .status-message.error { background: #e74c3c; }
+    .status-message.success {
+      background: var(--m-green-pale);
+      color: var(--m-green);
+      border-left: 4px solid var(--m-green);
+    }
+    .status-message.error {
+      background: var(--m-red-pale);
+      color: var(--m-red);
+      border-left: 4px solid var(--m-red);
+    }
     @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+      from { transform: translateY(8px); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Custom Toolbar Builder</h1>
-    <div class="header-buttons">
-      <button class="import" onclick="importConfig()">Import</button>
-      <button class="export" onclick="exportConfig()">Export</button>
+  <!-- Trimble blue app header -->
+  <header class="app-header">
+    <div class="app-header-brand">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/>
+      </svg>
+      <span class="app-header-title">Custom Toolbar Builder</span>
     </div>
-  </div>
-  
+    <div class="app-header-actions">
+      <button class="btn btn-outline" onclick="importConfig()">&#8593; Import</button>
+      <button class="btn btn-outline" onclick="exportConfig()">&#8595; Export</button>
+    </div>
+  </header>
+
   <div class="main-content">
+    <!-- Left: available commands -->
     <div class="panel panel-left">
       <div class="panel-header">
         <h2>Available Commands</h2>
       </div>
       <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search commands..." onkeyup="filterCommands()">
+        <input type="text" id="searchInput" placeholder="Search by plugin or command name…" onkeyup="filterCommands()">
       </div>
       <div class="list-container" id="availableList">
         <div class="empty-state">
-          <div class="empty-state-icon">⟳</div>
-          <p>Loading commands...</p>
+          <div class="empty-state-icon">&#8635;</div>
+          <p>Loading commands…</p>
         </div>
       </div>
       <div class="panel-footer">
-        <span id="availableCount">0 commands</span>
-        <button class="btn-primary" onclick="addSelectedCommands()">Add Selected</button>
+        <span class="panel-footer-left" id="availableCount">0 commands</span>
+        <div class="panel-footer-right">
+          <button class="btn btn-primary" onclick="addSelectedCommands()">Add Selected</button>
+        </div>
       </div>
     </div>
-    
+
+    <!-- Right: selected commands -->
     <div class="panel panel-right">
       <div class="panel-header">
-        <h2>Selected Commands</h2>
+        <h2>Toolbar Contents</h2>
       </div>
       <div class="toolbar-config">
         <label>Toolbar Name</label>
-        <input type="text" id="toolbarName" placeholder="Enter toolbar name...">
+        <input type="text" id="toolbarName" placeholder="Enter toolbar name…">
       </div>
       <div class="selected-list" id="selectedList">
         <div class="empty-state">
-          <div class="empty-state-icon">☰</div>
+          <div class="empty-state-icon">&#9776;</div>
           <p>Select commands from the left<br>to build your toolbar</p>
         </div>
       </div>
       <div class="panel-footer">
-        <button class="btn-danger" onclick="clearSelection()">Clear All</button>
-        <button class="btn-secondary" onclick="addSeparator()">+ Separator</button>
-        <button class="btn-primary" onclick="saveToolbar()">Save Toolbar</button>
+        <div class="panel-footer-left">
+          <button class="btn btn-danger" onclick="clearSelection()">Clear</button>
+        </div>
+        <div class="panel-footer-right">
+          <button class="btn btn-tertiary" onclick="addSeparator()">+ Separator</button>
+          <button class="btn btn-primary" onclick="saveToolbar()">Save Toolbar</button>
+        </div>
       </div>
     </div>
-    
+
+    <!-- Saved toolbars sidebar -->
     <div class="saved-toolbars">
       <div class="panel-header">
         <h2>Saved Toolbars</h2>
@@ -616,6 +861,7 @@ module Yoo
     var DEFAULT_ICON = '#{default_icon}';
     var dragSrcIndex = null;
     var dropTargetIndex = null;
+    var collapsedGroups = {};
 
     // Pull data from Ruby once DOM is ready - avoids execute_script race condition
     document.addEventListener('DOMContentLoaded', function() {
@@ -658,7 +904,7 @@ module Yoo
         var list = document.getElementById('availableList');
         var searchInput = document.getElementById('searchInput');
         var searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-        
+
         var filtered = availableCommands.filter(function(cmd) {
           return cmd.name.toLowerCase().includes(searchTerm) ||
             (cmd.tooltip && cmd.tooltip.toLowerCase().includes(searchTerm)) ||
@@ -667,24 +913,65 @@ module Yoo
 
         if (filtered.length === 0) {
           list.innerHTML = '<div class="empty-state"><p>No commands found</p></div>';
+          var countEl = document.getElementById('availableCount');
+          if (countEl) countEl.textContent = '0 commands';
           return;
         }
 
+        // Group by source_toolbar
+        var groups = {};
+        var groupOrder = [];
+        filtered.forEach(function(cmd) {
+          var src = (cmd.source_toolbar && cmd.source_toolbar !== 'Unknown') ? cmd.source_toolbar : 'Other';
+          if (!groups[src]) { groups[src] = []; groupOrder.push(src); }
+          groups[src].push(cmd);
+        });
+        groupOrder.sort(function(a, b) {
+          if (a === 'SketchUp') return -1;
+          if (b === 'SketchUp') return 1;
+          if (a === 'Other') return 1;
+          if (b === 'Other') return -1;
+          return a.localeCompare(b);
+        });
+
+        var isSearching = searchTerm.length > 0;
         var html = '';
-        for (var i = 0; i < filtered.length; i++) {
-          var cmd = filtered[i];
-          var iconHtml = '<img class="cmd-icon" src="' + (cmd.icon_path || DEFAULT_ICON) + '">';
-          var sourceLine = (cmd.source_toolbar && cmd.source_toolbar !== 'Unknown') ? cmd.source_toolbar : '';
-          html += '<div class="command-item" data-id="' + cmd.command_ref + '">' +
-            '<input type="checkbox" value="' + cmd.command_ref + '" onchange="toggleSelection(this)">' +
-            iconHtml +
-            '<div class="command-info">' +
-              (sourceLine ? '<div class="command-name">' + escapeHtml(sourceLine) + '</div>' : '') +
-              '<div class="command-source">' + escapeHtml(cmd.name) + '</div>' +
-            '</div>' +
-          '</div>';
-        }
+        groupOrder.forEach(function(src) {
+          var cmds = groups[src];
+          var groupId = 'grp_' + src.replace(/[^a-z0-9]/gi, '_');
+          var collapsed = (!isSearching && collapsedGroups[src]) ? 'collapsed' : '';
+          html += '<button class="cmd-group-header ' + collapsed + '" data-group="' + escapeHtml(src) + '" data-body="' + groupId + '">' +
+            '<span class="group-chevron">&#9660;</span>' +
+            escapeHtml(src) +
+            '<span class="group-count">' + cmds.length + '</span>' +
+          '</button>';
+          html += '<div class="cmd-group-body ' + collapsed + '" id="' + groupId + '">';
+          cmds.forEach(function(cmd) {
+            var iconHtml = '<img class="cmd-icon" src="' + (cmd.icon_path || DEFAULT_ICON) + '">';
+            html += '<div class="command-item" data-id="' + cmd.command_ref + '">' +
+              '<input type="checkbox" value="' + cmd.command_ref + '" onchange="toggleSelection(this)">' +
+              iconHtml +
+              '<div class="command-info">' +
+                '<div class="command-name">' + escapeHtml(cmd.name) + '</div>' +
+              '</div>' +
+            '</div>';
+          });
+          html += '</div>';
+        });
+
         list.innerHTML = html;
+
+        // Collapse toggle via event delegation
+        list.querySelectorAll('.cmd-group-header').forEach(function(header) {
+          header.addEventListener('click', function() {
+            var src = header.getAttribute('data-group');
+            var bodyId = header.getAttribute('data-body');
+            var body = document.getElementById(bodyId);
+            var isNowCollapsed = header.classList.toggle('collapsed');
+            body.classList.toggle('collapsed', isNowCollapsed);
+            collapsedGroups[src] = isNowCollapsed;
+          });
+        });
 
         var countEl = document.getElementById('availableCount');
         if (countEl) countEl.textContent = filtered.length + ' commands';
@@ -933,7 +1220,9 @@ module Yoo
             tooltip: cmd.tooltip,
             status_bar_text: cmd.status_bar_text,
             icon_path: cmd.icon_path,
-            source_toolbar: cmd.source_toolbar
+            source_toolbar: cmd.source_toolbar,
+            is_native: cmd.is_native || false,
+            native_action: cmd.native_action || null
           };
         })
       };
@@ -945,6 +1234,11 @@ module Yoo
     function loadToolbar(name) {
       var toolbar = savedToolbars.find(function(t) { return t.name === name; });
       if (!toolbar) return;
+
+      // Clear any checked checkboxes in the available list first
+      document.querySelectorAll('#availableList input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = false;
+      });
 
       currentToolbarName = name;
       document.getElementById('toolbarName').value = name;

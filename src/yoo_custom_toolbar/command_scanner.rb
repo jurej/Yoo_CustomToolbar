@@ -75,10 +75,116 @@ module Yoo
             next if seen_object_ids.key?(oid)
             commands << ec
           end
-          commands.sort_by { |cmd| cmd[:name].downcase }
+
+          # Strategy 4: Add native SketchUp tools (C++ side, not visible to ObjectSpace)
+          native_cmds = native_sketchup_commands
+          seen_refs = commands.map { |c| c[:command_ref] }.to_set
+          native_cmds.each do |nc|
+            commands << nc unless seen_refs.include?(nc[:command_ref])
+          end
+
+          commands.sort_by { |cmd| [cmd[:source_toolbar].downcase, cmd[:name].downcase] }
         rescue => e
           []
         end
+      end
+
+      # Build synthetic command entries for native SketchUp tools.
+      # Native tools are C++ objects not visible to ObjectSpace; we represent them
+      # as data-only entries that are restored via Sketchup.send_action at toolbar load time.
+      def self.native_sketchup_commands
+        imgs = Sketchup.find_support_file('Images') || ''
+
+        # [label, action_string_or_CMD_const, icon_basename, tooltip, status_bar_text]
+        definitions = [
+          # Drawing tools
+          ['Line',                'selectLineTool:',            'tb_line',           'Draw lines',                    'Draw straight lines'],
+          ['Arc',                 'selectArcTool:',             'tb_arc',            'Draw arcs',                     'Draw arcs by 3 points'],
+          ['Freehand',            'selectFreehandTool:',        'tb_freehand',       'Draw freehand lines',           'Sketch freehand lines'],
+          ['Rectangle',           'selectRectangleTool:',       'tb_rectangle',      'Draw rectangles',               'Draw rectangles'],
+          ['Circle',              'selectCircleTool:',          'tb_circle',         'Draw circles',                  'Draw circles'],
+          ['Polygon',             'selectPolygonTool:',         'tb_polygon',        'Draw polygons',                 'Draw polygons'],
+          # Modification tools
+          ['Select',              'selectSelectionTool:',       'tb_select',         'Select objects',                'Select, move, scale and rotate objects'],
+          ['Erase',               'selectEraseTool:',           'tb_erase',          'Erase geometry',                'Erase edges and faces'],
+          ['Move',                'selectMoveTool:',            'tb_move',           'Move/Copy objects',             'Move or copy selected objects'],
+          ['Push/Pull',           'selectPushPullTool:',        'tb_pushpull',       'Push/Pull faces',               'Push and pull faces to add volume'],
+          ['Rotate',              'selectRotateTool:',          'tb_rotate',         'Rotate objects',                'Rotate geometry around an axis'],
+          ['Scale',               'selectScaleTool:',           'tb_scale',          'Scale objects',                 'Scale geometry'],
+          ['Offset',              'selectOffsetTool:',          'tb_offset',         'Offset edges/faces',            'Offset edges or faces'],
+          ['Follow Me',           'selectExtrudeTool:',         'tb_followme',       'Follow Me',                     'Extrude a face along a path'],
+          ['Flip',                'selectFlipTool:',            'tb_flip',           'Flip objects',                  'Flip selected objects along an axis'],
+          # Measurement
+          ['Tape Measure',        'selectMeasureTool:',         'tb_measure',        'Measure distances',             'Measure distances and create guide lines'],
+          ['Protractor',          'selectProtractorTool:',      'tb_protractor',     'Measure angles',                'Measure angles and create guide lines'],
+          ['Dimension',           'selectDimensionTool:',       'tb_dimension',      'Add dimensions',                'Create dimension annotations'],
+          ['Text Label',          'selectTextTool:',            'tb_label',          'Add text labels',               'Create text labels'],
+          # Construction
+          ['Axes',                'selectAxisTool:',            'tb_axes',           'Place drawing axes',            'Position the drawing axes'],
+          ['Section Plane',       'selectSectionPlaneTool:',    'tb_sectionplane',   'Add section plane',             'Create section cuts through the model'],
+          ['3D Text',             'select3dTextTool:',          'tb_3dtext',         'Place 3D text',                 'Place extruded 3D text'],
+          # Paint
+          ['Paint Bucket',        'selectPaintTool:',           'tb_paint',          'Apply materials',               'Paint faces with materials and colors'],
+          # Camera
+          ['Orbit',               'selectOrbitTool:',           'tb_orbit',          'Orbit the camera',              'Orbit the camera around the model'],
+          ['Pan',                 'selectPanTool:',             'tb_pan',            'Pan the camera',                'Pan the camera'],
+          ['Zoom',                'selectZoomTool:',            'tb_zoom',           'Zoom the camera',               'Zoom in/out'],
+          ['Zoom Window',         'selectZoomWindowTool:',      'tb_zoomwindow',     'Zoom to window',                'Drag a window to zoom to that area'],
+          ['Zoom Extents',        'viewZoomExtents:',           'tb_zoomextents',    'Zoom to fit model',             'Zoom to fit the entire model in view'],
+          ['Previous View',       'viewUndo:',                  'tb_previousview',   'Previous view',                 'Return to previous camera position'],
+          ['Next View',           'viewRedo:',                  'tb_nextview',       'Next view',                     'Go to next camera position'],
+          ['Walk',                'selectWalkTool:',            'tb_walk',           'Walk through model',            'Interactively walk through the model'],
+          ['Look Around',         'selectLookAroundTool:',      'tb_lookaround',     'Look around',                   'Pivot the camera in place'],
+          ['Position Camera',     'selectPositionCameraTool:',  'tb_positioncamera', 'Position camera',               'Place the camera at a specific location'],
+          # Standard views
+          ['Top View',            'viewTop:',                   'tb_topview',        'Top view',                      'Switch to top view'],
+          ['Front View',          'viewFront:',                 'tb_frontview',      'Front view',                    'Switch to front view'],
+          ['Right View',          'viewRight:',                 'tb_rightview',      'Right view',                    'Switch to right view'],
+          ['Back View',           'viewBack:',                  'tb_backview',       'Back view',                     'Switch to back view'],
+          ['Left View',           'viewLeft:',                  'tb_leftview',       'Left view',                     'Switch to left view'],
+          ['Bottom View',         'viewBottom:',                'tb_bottomview',     'Bottom view',                   'Switch to bottom view'],
+          ['Isometric View',      'viewIso:',                   'tb_isoview',        'Isometric view',                'Switch to isometric view'],
+          # Display modes
+          ['Wireframe',           'viewWireframe:',             'tb_wireframe',      'Wireframe display',             'Display edges only'],
+          ['Hidden Line',         'viewHiddenLine:',            'tb_hiddenline',     'Hidden line display',           'Display with hidden lines removed'],
+          ['Shaded',              'viewShaded:',                'tb_shaded',         'Shaded display',                'Display with shaded faces'],
+          ['Shaded with Textures','viewShadedTexture:',         'tb_textures',       'Shaded with textures',          'Display with textures applied'],
+          ['Monochrome',          'viewMonochrome:',            'tb_monochrome',     'Monochrome display',            'Display in monochrome shaded mode'],
+          ['X-Ray',               'viewTransparent:',           'tb_xray',           'X-Ray mode',                   'Toggle X-Ray transparency mode'],
+          # Standard file/edit
+          ['New',                 'newDocument:',               'tb_new',            'New model',                     'Create a new model'],
+          ['Open',                'openDocument:',              'tb_open',           'Open model',                    'Open an existing model'],
+          ['Save',                'saveDocument:',              'tb_save',           'Save model',                    'Save the current model'],
+          ['Print',               'printDocument:',             'tb_print',          'Print',                         'Print the current model'],
+          ['Undo',                'editUndo:',                  'tb_undo',           'Undo',                          'Undo the last action'],
+          ['Redo',                'editRedo:',                  'tb_redo',           'Redo',                          'Redo the last undone action'],
+          ['Cut',                 'cut:',                       'tb_cut',            'Cut',                           'Cut selected to clipboard'],
+          ['Copy',                'copy:',                      'tb_copy',           'Copy',                          'Copy selected to clipboard'],
+          ['Paste',               'paste:',                     'tb_paste',          'Paste',                         'Paste from clipboard'],
+          ['Delete',              'editDelete:',                'tb_delete',         'Delete',                        'Delete selected'],
+          # Components
+          ['Make Component',      'makeUniqueComponent:',       'tb_newcomponent',   'Make Component',                'Create a component from selection'],
+        ]
+
+        ext = RUBY_PLATFORM =~ /darwin/ ? '.pdf' : '.svg'
+
+        definitions.map do |label, action, icon_base, tooltip, status|
+          icon = File.join(imgs, "#{icon_base}#{ext}").gsub('\\', '/')
+          icon = '' unless File.exist?(icon)
+          {
+            id:             "native_#{icon_base}",
+            name:           label,
+            tooltip:        tooltip,
+            status_bar_text: status,
+            icon_path:      icon,
+            source_toolbar: 'SketchUp',
+            command_ref:    "native_#{icon_base}",
+            is_native:      true,
+            native_action:  action
+          }
+        end
+      rescue => e
+        []
       end
 
       # Try to infer which toolbar/plugin a command belongs to

@@ -74,6 +74,12 @@ module Yoo
 
       # Find or create a command based on stored configuration
       def self.find_or_create_command(cmd_config)
+        # Native SketchUp tools: create a send_action wrapper
+        ref = cmd_config[:command_ref].to_s
+        if ref.start_with?('native_') || cmd_config[:is_native]
+          return create_native_command(cmd_config)
+        end
+
         # Try to find existing command by reference
         existing_cmd = find_existing_command(cmd_config)
         if existing_cmd
@@ -91,6 +97,27 @@ module Yoo
 
         # If not found, create a placeholder command that shows info
         create_placeholder_command(cmd_config)
+      end
+
+      # Create a UI::Command that invokes a native SketchUp tool via send_action
+      def self.create_native_command(cmd_config)
+        action = cmd_config[:native_action].to_s
+        label  = cmd_config[:name] || 'Unknown'
+        cmd = UI::Command.new(label) { Sketchup.send_action(action) }
+        cmd.menu_text       = label
+        cmd.tooltip         = cmd_config[:tooltip] || label
+        cmd.status_bar_text = cmd_config[:status_bar_text] || label
+
+        icon = cmd_config[:icon_path].to_s
+        if icon.empty? || !File.exist?(icon)
+          icon = default_icon_path
+        end
+        if File.exist?(icon)
+          cmd.small_icon = icon
+          cmd.large_icon = icon
+        end
+
+        cmd
       end
 
       # Attempt to find an existing command in ObjectSpace
