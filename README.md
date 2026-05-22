@@ -1,6 +1,7 @@
 # Custom Toolbar Builder for SketchUp
 
 A SketchUp extension that lets you build custom toolbars from buttons of any loaded extension. Similar to Fredo LordofToolbars but simpler and more focused.
+<img width="1432" height="1169" alt="image" src="https://github.com/user-attachments/assets/0d2e263f-ae16-4e22-8799-77f220804d23" />
 
 ## Features
 
