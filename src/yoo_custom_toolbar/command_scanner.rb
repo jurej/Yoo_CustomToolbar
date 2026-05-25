@@ -302,13 +302,24 @@ module Yoo
         end
       end
 
-      # Generate a unique ID for a command based on its properties
+      # Generate a stable cross-session ID for a command.
+      # Uses icon path (most unique artifact) + name + status text.
+      # Falls back to object_id only when no other data is available.
       def self.generate_command_id(command)
         begin
-          text = command.menu_text || command.tooltip || command.object_id.to_s
-          Digest::MD5.hexdigest(text + (command.status_bar_text || ''))[0..12]
+          icon = command.small_icon || command.large_icon || ''
+          name = command.menu_text || command.tooltip || ''
+          status = command.status_bar_text || ''
+          key = if !icon.empty?
+            "#{File.basename(icon)}|#{name}|#{status}"
+          elsif !name.empty?
+            "#{name}|#{status}|#{command.object_id}"
+          else
+            command.object_id.to_s
+          end
+          Digest::MD5.hexdigest(key)
         rescue => e
-          Digest::MD5.hexdigest(command.object_id.to_s)[0..12]
+          Digest::MD5.hexdigest(command.object_id.to_s)
         end
       end
 

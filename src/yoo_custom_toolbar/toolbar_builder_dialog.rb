@@ -1243,8 +1243,24 @@ module Yoo
       currentToolbarName = name;
       document.getElementById('toolbarName').value = name;
       
-      // Reconstruct command objects from saved data
-      selectedCommands = toolbar.commands.map(function(cmd) { return availableCommands.find(function(c) { return c.id === cmd.id; }) || cmd; });
+      // Reconstruct command objects from saved data.
+      // Priority:
+      //   1. Stable id (32-char MD5 of icon+name+status) — works across restarts
+      //   2. command_ref only for native tools (stable "native_xxx" strings)
+      //   3. Fall back to saved data so the item still appears (placeholder)
+      selectedCommands = toolbar.commands.map(function(cmd) {
+        if (cmd.is_separator) return cmd;
+        var byId = (cmd.id && cmd.id.length === 32)
+          ? availableCommands.find(function(c) { return c.id === cmd.id; })
+          : null;
+        if (byId) return byId;
+        // native_ refs are stable strings — safe to match directly
+        if (cmd.command_ref && cmd.command_ref.indexOf('native_') === 0) {
+          var byRef = availableCommands.find(function(c) { return c.command_ref === cmd.command_ref; });
+          if (byRef) return byRef;
+        }
+        return cmd;
+      });
       renderSelectedList();
       renderSavedList();
     }
