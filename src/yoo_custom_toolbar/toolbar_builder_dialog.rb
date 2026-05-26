@@ -1213,6 +1213,14 @@ module Yoo
       var config = {
         name: name,
         commands: selectedCommands.map(function(cmd) {
+          if (cmd.is_separator) {
+            return {
+              id: '__separator__',
+              command_ref: cmd.command_ref,
+              name: '— Separator —',
+              is_separator: true
+            };
+          }
           return {
             id: cmd.id,
             command_ref: cmd.command_ref,
@@ -1249,7 +1257,7 @@ module Yoo
       //   2. command_ref only for native tools (stable "native_xxx" strings)
       //   3. Fall back to saved data so the item still appears (placeholder)
       selectedCommands = toolbar.commands.map(function(cmd) {
-        if (cmd.is_separator) return cmd;
+        if (cmd.is_separator || cmd.id === '__separator__') return Object.assign({is_separator: true}, cmd);
         var byId = (cmd.id && cmd.id.length === 32)
           ? availableCommands.find(function(c) { return c.id === cmd.id; })
           : null;
