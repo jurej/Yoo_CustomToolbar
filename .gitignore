@@ -1,4 +1,5 @@
 *.rbz
+!releases/*.rbz
 *.zip
 .DS_Store
 Thumbs.db
